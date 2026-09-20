@@ -14,11 +14,16 @@ from app.auth import (SESSION_COOKIE, SESSION_HOURS, authenticate, create_sessio
 from app.database import BASE_DIR, connection, init_db
 from app.policy_info import POLICY_INFO
 from app.state_machine import TransitionError, available_actions, decide
+from app.seed import seed_database
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()          # runs once when the server starts
+    init_db()
+    with connection() as conn:
+        has_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] > 0
+    if not has_users:
+        seed_database()    # first start on a fresh server: create demo users and claim C001
     yield
 
 
@@ -29,6 +34,8 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), na
 FINANCE_VISIBLE = ("awaiting_finance", "ready_for_payment", "paid")
 HISTORY_VERB = {"submit": "submitted", "approve": "approved", "send_back": "sent_back",
                 "reject": "rejected", "verify": "verified", "pay": "paid"}
+
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE") == "1"   # set to 1 on the deployed HTTPS site
 
 
 class LoginRequest(BaseModel):
