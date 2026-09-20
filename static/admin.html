@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Admin - Nortex Expense</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Admin Oversight</h1>
+    <div>
+      <span id="userInfo"></span>
+      <a href="/static/dashboard.html" style="color:white; margin-left:16px;">← Back to claims</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h2>All Claims</h2>
+      <p style="color:#6b7280; font-size:14px;">
+        Read-only. Admin can see every claim regardless of stage, but cannot approve,
+        verify, or pay anything - separation of duties.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Claim</th><th>Employee</th><th>Total Claimed</th><th>Payable</th><th>Status</th></tr>
+        </thead>
+        <tbody id="claimsBody"><tr><td colspan="5">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Policy in Force</h2>
+      <div id="policyArea">Loading...</div>
+    </div>
+
+    <div class="card">
+      <h2>People and Reporting Lines</h2>
+      <table>
+        <thead><tr><th>Code</th><th>Name</th><th>Role</th><th>Reports To</th></tr></thead>
+        <tbody id="usersBody"><tr><td colspan="4">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    async function loadMe() {
+      const res = await fetch('/api/me');
+      if (!res.ok) { window.location.href = '/static/login.html'; return null; }
+      const user = await res.json();
+      if (user.role !== 'Admin') {
+        document.querySelector('.container').innerHTML =
+          '<div class="card">This page is for Admin only.</div>';
+        return null;
+      }
+      document.getElementById('userInfo').textContent = `${user.name} (${user.role})`;
+      return user;
+    }
+
+    async function loadClaims() {
+      const res = await fetch('/api/claims');
+      const claims = await res.json();
+      document.getElementById('claimsBody').innerHTML = claims.map(c => `
+        <tr>
+          <td>${c.claim_id}</td><td>${c.employee_name}</td>
+          <td>Rs ${c.total_claimed}</td><td>Rs ${c.payable_amount}</td>
+          <td><span class="badge badge-flagged">${c.status}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadPolicy() {
+      const res = await fetch('/api/admin/policy');
+      if (!res.ok) {
+        document.getElementById('policyArea').textContent = 'Could not load policy info.';
+        return;
+      }
+      const p = await res.json();
+
+      const bandsHtml = p.approval_bands.map(b =>
+        `<div class="summary-row"><span>${b.range}</span><span>${b.approvals.join(' → ')}</span></div>`
+      ).join('');
+
+      const lodgingHtml = Object.entries(p.lodging_limits_per_night).map(([k, v]) =>
+        `<div class="summary-row"><span>${k}</span><span>Rs ${v}/night</span></div>`
+      ).join('');
+
+      const mealsHtml = Object.entries(p.meal_limits_per_day).map(([k, v]) =>
+        `<div class="summary-row"><span>${k}</span><span>Rs ${v}/day</span></div>`
+      ).join('');
+
+      document.getElementById('policyArea').innerHTML = `
+        <p style="font-size:13px; color:#6b7280;">${p.document}</p>
+
+        <h3 style="font-size:14px; margin-top:16px;">Approval bands</h3>
+        ${bandsHtml}
+        <p style="font-size:13px; color:#6b7280; margin-top:6px;">${p.finance_verification}</p>
+
+        <h3 style="font-size:14px; margin-top:16px;">Lodging limits (per night)</h3>
+        ${lodgingHtml}
+
+        <h3 style="font-size:14px; margin-top:16px;">Meal limits (per day)</h3>
+        ${mealsHtml}
+
+        <h3 style="font-size:14px; margin-top:16px;">Non-reimbursable items</h3>
+        <ul style="font-size:14px; margin:4px 0;">
+          ${p.non_reimbursable_items.map(i => `<li>${i}</li>`).join('')}
+        </ul>
+
+        <div class="summary-row"><span>Submission window</span><span>${p.submission_window_days} days</span></div>
+        <div class="summary-row"><span>Payment runs</span><span>${p.payment_runs.join(', ')}</span></div>
+        <div class="summary-row"><span>Business entertainment</span><span>${p.business_entertainment}</span></div>
+      `;
+    }
+
+    async function loadUsers() {
+      const res = await fetch('/api/admin/users');
+      if (!res.ok) {
+        document.getElementById('usersBody').innerHTML = '<tr><td colspan="4">Could not load.</td></tr>';
+        return;
+      }
+      const users = await res.json();
+      document.getElementById('usersBody').innerHTML = users.map(u => `
+        <tr>
+          <td>${u.emp_code}</td><td>${u.name}</td><td>${u.role}</td>
+          <td>${u.manager_name || '-'}</td>
+        </tr>
+      `).join('');
+    }
+
+    (async () => {
+      const user = await loadMe();
+      if (user) {
+        loadClaims();
+        loadPolicy();
+        loadUsers();
+      }
+    })();
+  </script>
+</body>
+</html>

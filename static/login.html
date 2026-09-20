@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Nortex Travel Expense - Login</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header><h1>Nortex Travel Expense System</h1></header>
+
+  <div class="container">
+    <div class="card">
+      <h2>Log in</h2>
+      <p style="color:#6b7280; font-size:14px;">
+        Pick your employee code below (or type it) and enter the demo password.
+      </p>
+
+      <label style="font-size:13px; color:#6b7280;">Employee code</label>
+      <select id="userSelect" style="width:100%; padding:10px; font-size:14px; margin:6px 0 14px;">
+        <option value="">Loading employees...</option>
+      </select>
+
+      <label style="font-size:13px; color:#6b7280;">Password</label>
+      <input id="password" type="password" placeholder="Demo password"
+             style="width:100%; padding:10px; font-size:14px; margin:6px 0 14px;">
+
+      <button onclick="login()">Log in</button>
+      <p id="errorMsg" style="color:#dc2626; margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <script>
+    // Fill the dropdown from the public demo-users list (code, name, role only - no passwords here)
+    async function loadUsers() {
+      const res = await fetch('/api/demo-users');
+      const users = await res.json();
+      const select = document.getElementById('userSelect');
+      select.innerHTML = '';
+      users.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.emp_code;
+        opt.textContent = `${u.name} - ${u.role} (${u.emp_code})`;
+        select.appendChild(opt);
+      });
+    }
+
+    async function login() {
+      const empCode = document.getElementById('userSelect').value;
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('errorMsg');
+      errorEl.textContent = '';
+
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emp_code: empCode, password: password })
+      });
+
+      if (res.ok) {
+        // Login succeeded - the server set an HttpOnly cookie, JS never touches the password again.
+        window.location.href = '/static/dashboard.html';
+      } else {
+        const data = await res.json();
+        errorEl.textContent = `${data.detail || 'Login failed'}`;
+      }
+    }
+
+    // Let Enter key in the password field submit too
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('password').addEventListener('keydown', e => {
+        if (e.key === 'Enter') login();
+      });
+    });
+
+    loadUsers();
+  </script>
+</body>
+</html>

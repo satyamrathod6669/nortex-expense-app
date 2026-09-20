@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard - Nortex Expense</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Nortex Travel Expense System</h1>
+    <div>
+      <span id="userInfo"></span>
+      <button onclick="logout()" style="margin-left:12px; background:#6b7280;">Log out</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h2>Claims</h2>
+      <p style="color:#6b7280; font-size:14px;">
+        This list is filtered by the server: you only see claims you own, claims you're the
+        approver for, or (if you're Finance) claims that have reached the Finance stage.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Claim</th><th>Employee</th><th>Total Claimed</th><th>Payable</th>
+            <th>Status</th><th>Waiting On</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="claimsBody">
+          <tr><td colspan="7">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    async function loadMe() {
+      const res = await fetch('/api/me');
+      if (!res.ok) {
+        // No valid session - back to login
+        window.location.href = '/static/login.html';
+        return null;
+      }
+      const user = await res.json();
+      document.getElementById('userInfo').textContent = `${user.name} (${user.role})`;
+      if (user.role === 'Admin') {
+        document.getElementById('userInfo').innerHTML += ` <a href="/static/admin.html" style="color:white; margin-left:12px;">Admin panel →</a>`;
+    }
+
+      return user;
+    }
+
+    async function loadClaims() {
+      const res = await fetch('/api/claims');
+      if (res.status === 401) {
+        window.location.href = '/static/login.html';
+        return;
+      }
+      const claims = await res.json();
+      const tbody = document.getElementById('claimsBody');
+
+      if (claims.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7">No claims visible to you right now.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = claims.map(c => `
+        <tr>
+          <td>${c.claim_id}</td>
+          <td>${c.employee_name}</td>
+          <td>Rs ${c.total_claimed}</td>
+          <td>Rs ${c.payable_amount}</td>
+          <td><span class="badge badge-flagged">${c.status}</span></td>
+          <td style="font-size:13px; color:#6b7280;">${c.waiting_on || '-'}</td>
+          <td><a href="/static/claim.html?id=${c.claim_id}"><button>Open</button></a></td>
+        </tr>
+      `).join('');
+    }
+
+    async function logout() {
+      await fetch('/api/logout', { method: 'POST' });
+      window.location.href = '/static/login.html';
+    }
+
+    (async () => {
+      const user = await loadMe();
+      if (user) loadClaims();
+    })();
+  </script>
+</body>
+</html>
