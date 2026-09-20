@@ -125,7 +125,7 @@ def demo_users():
         rows = conn.execute("SELECT emp_code, name, role FROM users ORDER BY name").fetchall()
     return [dict(r) for r in rows]
 
-
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE") == "1"   # set to 1 on the deployed HTTPS site
 @app.post("/api/login")
 def login(req: LoginRequest, response: Response):
     user = authenticate(req.emp_code, req.password)
@@ -134,7 +134,7 @@ def login(req: LoginRequest, response: Response):
     token = create_session(user["emp_code"])
     # HttpOnly: page JavaScript can't read the cookie. SameSite=Lax: other sites can't send it on POSTs.
     response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="lax",
-                        max_age=SESSION_HOURS * 3600)
+                        secure=COOKIE_SECURE, max_age=SESSION_HOURS * 3600)
     return {"emp_code": user["emp_code"], "name": user["name"], "role": user["role"]}
 
 
